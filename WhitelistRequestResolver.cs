@@ -9,11 +9,16 @@ using System.Net;
 
 public class WhitelistRequestResolver : IRequestResolver
 {
-    private readonly HashSet<string> _whitelist;
+    // Func so it always reads the CURRENT active whitelist (strict or full)
+    private readonly Func<HashSet<string>> _getWhitelist;
+    private readonly HashSet<string> _dynamicEntries;
 
-    public WhitelistRequestResolver(HashSet<string> whitelist)
+    public WhitelistRequestResolver(
+        Func<HashSet<string>> getWhitelist,
+        HashSet<string> dynamicEntries)
     {
-        _whitelist = whitelist;
+        _getWhitelist = getWhitelist;
+        _dynamicEntries = dynamicEntries;
     }
 
     public async Task<IResponse> Resolve(IRequest request,
@@ -28,19 +33,18 @@ public class WhitelistRequestResolver : IRequestResolver
             if (IsWhitelisted(domain))
             {
                 ServiceLogger.Dns($"✅ ALLOWED: {domain}");
+                DnsWhitelistService.IncrementAllowed();
 
                 try
                 {
                     var client = new DnsClient("1.1.1.1");
                     var task = client.Resolve(domain, question.Type);
-                    var completed = await Task.WhenAny(task, Task.Delay(5000));
+                    var completed = await Task.WhenAny(task, Task.Delay(5000, cancellationToken));
 
                     if (completed == task && task.IsCompletedSuccessfully)
                     {
                         foreach (var answer in task.Result.AnswerRecords)
-                        {
                             ((Response)response).AnswerRecords.Add(answer);
-                        }
                     }
                     else
                     {
@@ -55,11 +59,13 @@ public class WhitelistRequestResolver : IRequestResolver
             else
             {
                 ServiceLogger.Dns($"🚫 BLOCKED: {domain}");
+                DnsWhitelistService.IncrementBlocked();
 
                 var record = new IPAddressResourceRecord(
                     question.Name,
                     IPAddress.Any,
                     TimeSpan.FromMinutes(5));
+
                 ((Response)response).AnswerRecords.Add(record);
             }
         }
@@ -69,12 +75,25 @@ public class WhitelistRequestResolver : IRequestResolver
 
     private bool IsWhitelisted(string domain)
     {
-        if (_whitelist.Contains(domain)) return true;
+        var whitelist = _getWhitelist();
 
-        foreach (var allowed in _whitelist)
+        // Check static whitelist
+        if (whitelist.Contains(domain)) return true;
+        foreach (var allowed in whitelist)
         {
             if (domain.EndsWith("." + allowed, StringComparison.OrdinalIgnoreCase))
                 return true;
+        }
+
+        // Check dynamic entries (password-added)
+        lock (_dynamicEntries)
+        {
+            if (_dynamicEntries.Contains(domain)) return true;
+            foreach (var allowed in _dynamicEntries)
+            {
+                if (domain.EndsWith("." + allowed, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
         }
 
         return false;
