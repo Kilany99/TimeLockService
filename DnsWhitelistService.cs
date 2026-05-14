@@ -32,6 +32,7 @@ public class DnsWhitelistService : BackgroundService
     // ─── Full whitelist (work hours) ─────────────────────────────────────────
     private readonly HashSet<string> _whitelist = new(StringComparer.OrdinalIgnoreCase)
     {
+      
         // Microsoft / Work
         "login.microsoftonline.com",
         "portal.azure.com",
@@ -58,8 +59,6 @@ public class DnsWhitelistService : BackgroundService
         "app.alignerr.com",
         "github.com",
         "stackoverflow.com",
-        "google.com",
-        "www.google.com",
         "gmail.com",
         "mail.google.com",
         "whatsapp.com",
@@ -135,13 +134,26 @@ public class DnsWhitelistService : BackgroundService
         "ssl.gstatic.com",
         "apis.google.com",
         "play.google.com",
-
+        "docs.google.com",
+        "identity.telerik.com",
+        "fd.api.iris.microsoft.com",
+        "kendo.cdn.telerik.com",
+        "maxst.icons8.com",
+        "appassets.home",
+        "crl.pki.goog",
+        "statics.teams.cdn.live.net",
+        "teams.live.com",
         // ChatGPT
         "openai.com",
         "api.openai.com",
         "cdn.openai.com",
         "auth0.openai.com",
         "oaiusercontent.com",
+        "portal.unifiaccess.com",
+        "res-1.cdn.office.net",
+        "res.public.onecdn.static.microsoft",
+        "wpad.home",
+        "assets.msn.com",
 
         // Claude AI
         "anthropic.com",
